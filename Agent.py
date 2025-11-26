@@ -1,20 +1,15 @@
 # agente.py
 
-import random
-
 class AgenteBase:
-    def __init__(self, nome):
+    def __init__(self, nome, world):
         self.nome = nome
+        self.world = world
 
     def decidir(self, observacao):
         raise NotImplementedError
 
 
-class AgenteFarolBurro(AgenteBase):
-    def __init__(self, nome, world):
-        super().__init__(nome)
-        self.world = world
-
+class AgenteFarolFixo(AgenteBase):
     def decidir(self, observacao):
         direcao = observacao["direcao"]
 
@@ -30,51 +25,34 @@ class AgenteFarolBurro(AgenteBase):
             "AQUI": (0, 0)
         }
 
-        mov_principal = movimentos[direcao]
-
-        alternativas = {
-            "NE": [(0, -1), (1, 0)],
-            "NW": [(0, -1), (-1, 0)],
-            "SE": [(0, 1), (1, 0)],
-            "SW": [(0, 1), (-1, 0)],
-            "N":  [(0, -1)],
-            "S":  [(0, 1)],
-            "E":  [(1, 0)],
-            "W":  [(-1, 0)],
-            "AQUI": [(0, 0)]
-        }
+        principal = movimentos[direcao]
 
         ax, ay = self.world.agent_pos[self.nome]
 
-        # 1) Tentar movimento principal
-        dx, dy = mov_principal
+        # 1) tentar movimento principal
+        dx, dy = principal
         nx, ny = ax + dx, ay + dy
-        if (nx, ny) not in self.world.obstaculos:
-            return mov_principal
+        if self._livre(nx, ny):
+            return principal
 
-        # 2) Tentar alternativas diretas
-        for alt in alternativas[direcao]:
-            dx, dy = alt
-            nx, ny = ax + dx, ay + dy
-            if (nx, ny) not in self.world.obstaculos:
-                return alt
-
-        # 3) Movimento de desvio: qualquer célula vizinha livre
-        vizinhos = [
-            (1, 0), (-1, 0),  # E, W
-            (0, 1), (0, -1),  # S, N
-            (1, 1), (1, -1), (-1, 1), (-1, -1)  # diagonais
+        # 2) tentar movimentos alternativos simples
+        alternativas = [
+            (1, 0), (-1, 0), (0, 1), (0, -1)
         ]
 
-        livres = []
-        for dx, dy in vizinhos:
+        for dx, dy in alternativas:
             nx, ny = ax + dx, ay + dy
-            if 0 <= nx < self.world.size and 0 <= ny < self.world.size:
-                if (nx, ny) not in self.world.obstaculos:
-                    livres.append((dx, dy))
+            if self._livre(nx, ny):
+                return (dx, dy)
 
-        if livres:
-            return random.choice(livres)
-
-        # 4) Se estiver COMPLETAMENTE cercado (raro), fica parado
+        # 3) se tudo falhar, fica parado
         return (0, 0)
+
+    def _livre(self, x, y):
+        # dentro do mundo?
+        if not (0 <= x < self.world.size and 0 <= y < self.world.size):
+            return False
+        # sem obstáculo?
+        if (x, y) in self.world.obstaculos:
+            return False
+        return True
