@@ -1,5 +1,7 @@
 # world.py
+
 import random
+
 
 class WorldBase:
     def observacaoPara(self, agente):
@@ -16,17 +18,17 @@ class WorldBase:
 
 
 class WorldFarol(WorldBase):
-    def __init__(self, size=10 , num_obstaculos=12):
+    def __init__(self, size=10, num_obstaculos=15):
         self.size = size
         self.agent_pos = {"Explorer": (0, 0)}
-        self.farol_pos = (size -1,size -1)
+        self.farol_pos = (size - 1, size - 1)
 
+        # gerar obstáculos aleatórios
         self.obstaculos = set()
         while len(self.obstaculos) < num_obstaculos:
             x = random.randint(0, size - 1)
             y = random.randint(0, size - 1)
 
-            # não pode colocar no agente nem no farol
             if (x, y) not in [(0, 0), self.farol_pos]:
                 self.obstaculos.add((x, y))
 
@@ -47,24 +49,27 @@ class WorldFarol(WorldBase):
                 direcao += "N"
             elif dy > 0:
                 direcao += "S"
-
             if dx > 0:
                 direcao += "E"
             elif dx < 0:
                 direcao += "W"
 
-        return {
-            "pos": (ax, ay),
-            "direcao": direcao
-        }
+        return {"pos": (ax, ay), "direcao": direcao}
 
     def agir(self, accao, agente):
         ax, ay = self.agent_pos[agente.nome]
         dx, dy = accao
         nx, ny = ax + dx, ay + dy
 
-        if 0 <= nx < self.size and 0 <= ny < self.size:
-            self.agent_pos[agente.nome] = (nx, ny)
+        # dentro dos limites?
+        if not (0 <= nx < self.size and 0 <= ny < self.size):
+            return
+
+        # obstáculo?
+        if (nx, ny) in self.obstaculos:
+            return
+
+        self.agent_pos[agente.nome] = (nx, ny)
 
     def atualizacao(self):
         if self.agent_pos["Explorer"] == self.farol_pos:
@@ -81,7 +86,6 @@ class WorldFarol(WorldBase):
         for y in range(self.size):
             linha = ""
             for x in range(self.size):
-
                 if (x, y) == (ax, ay):
                     linha += " A "
                 elif (x, y) == (fx, fy):
