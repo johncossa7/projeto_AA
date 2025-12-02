@@ -1,58 +1,81 @@
-# agente.py
+from Acao import Acao
+from Observacao import Observacao
 
 class AgenteBase:
-    def __init__(self, nome, world):
+    def __init__(self, nome):
         self.nome = nome
-        self.world = world
+        self._sensor = None
 
-    def decidir(self, observacao):
+    @staticmethod
+    def cria(nome_do_ficheiro_parametros=None):
         raise NotImplementedError
 
+    def instala(self, sensor):
+        self._sensor = sensor
 
-class AgenteFarolFixo(AgenteBase):
-    def decidir(self, observacao):
-        direcao = observacao["direcao"]
+    def observacao(self, obs):
+        raise NotImplementedError
 
-        movimentos = {
-            "N":  (0, -1),
-            "S":  (0, 1),
-            "E":  (1, 0),
-            "W":  (-1, 0),
-            "NE": (1, -1),
-            "NW": (-1, -1),
-            "SE": (1, 1),
-            "SW": (-1, 1),
-            "AQUI": (0, 0)
-        }
+    def age(self):
+        raise NotImplementedError
 
-        principal = movimentos[direcao]
+    def avaliacaoEstadoAtual(self, recompensa: float):
+        pass
 
-        ax, ay = self.world.agent_pos[self.nome]
+    def comunica(self, mensagem: str, de_agente):
+        pass
 
-        # 1) tentar movimento principal
-        dx, dy = principal
-        nx, ny = ax + dx, ay + dy
-        if self._livre(nx, ny):
-            return principal
+from Acao import Acao
 
-        # 2) tentar movimentos alternativos simples
-        alternativas = [
-            (1, 0), (-1, 0), (0, 1), (0, -1)
+class AgenteFarol(AgenteBase):
+
+    MOVS = {
+        "N":  (0, -1),
+        "S":  (0, 1),
+        "E":  (1, 0),
+        "W":  (-1, 0),
+    }
+
+    def __init__(self, nome):
+        super().__init__(nome)
+        self._ultima_obs = None
+
+    @staticmethod
+    def cria(nome_do_ficheiro_parametros=None):
+        return AgenteFarol("Explorer")
+
+    def observacao(self, obs):
+        if isinstance(obs, str):
+            self._ultima_obs = obs.upper()
+        else:
+            # caso seja objeto Observacao
+            self._ultima_obs = obs.direcao.upper()
+
+    def age(self) -> Acao:
+        """Devolve sempre um objeto Acao"""
+
+        if self._ultima_obs is None or self._ultima_obs == "AQUI":
+            return Acao(0, 0)
+
+        dx = dy = 0
+        for ch in self._ultima_obs:
+            if ch in self.MOVS:
+                mx, my = self.MOVS[ch]
+                dx += mx
+                dy += my
+
+        # lista de movimentos ordenada por prioridade
+        opcoes = [
+            (dx, dy),          # diagonal principal
+            (dx, 0), (0, dy),  # componentes separadas
+            (1,0), (-1,0), (0,1), (0,-1), (-1,-1),  # movimentos cardinais gerais
+            (0,0)              # fallback: ficar parado
         ]
 
-        for dx, dy in alternativas:
-            nx, ny = ax + dx, ay + dy
-            if self._livre(nx, ny):
-                return (dx, dy)
+        # verificar com sensor
+        for mx, my in opcoes:
+            if self._sensor and self._sensor.livre(mx, my):
+                return Acao(mx, my)
 
-        # 3) se tudo falhar, fica parado
-        return (0, 0)
-
-    def _livre(self, x, y):
-        # dentro do mundo?
-        if not (0 <= x < self.world.size and 0 <= y < self.world.size):
-            return False
-        # sem obstáculo?
-        if (x, y) in self.world.obstaculos:
-            return False
-        return True
+        # fallback final
+        return Acao(0, 0)
