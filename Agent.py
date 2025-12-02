@@ -1,5 +1,3 @@
-from Acao import Acao
-from Observacao import Observacao
 
 class AgenteBase:
     def __init__(self, nome):

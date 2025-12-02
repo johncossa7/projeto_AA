@@ -21,6 +21,7 @@ import random
 
 class WorldFarol:
     def __init__(self, size=10, num_obstaculos=0, farol_pos=None):
+        #Colocar o world como ficheiro
         self.size = size
         self._terminado = False
 
