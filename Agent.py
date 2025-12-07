@@ -1,11 +1,10 @@
-
 class AgenteBase:
     def __init__(self, nome):
         self.nome = nome
         self._sensor = None
 
     @staticmethod
-    def cria(nome_do_ficheiro_parametros=None):
+    def cria(nome_do_ficheiro_parametros):
         raise NotImplementedError
 
     def instala(self, sensor):
@@ -37,10 +36,6 @@ class AgenteFarol(AgenteBase):
     def __init__(self, nome):
         super().__init__(nome)
         self._ultima_obs = None
-
-    @staticmethod
-    def cria(nome_do_ficheiro_parametros=None):
-        return AgenteFarol("Explorer")
 
     def observacao(self, obs):
         if isinstance(obs, str):
@@ -77,3 +72,7 @@ class AgenteFarol(AgenteBase):
 
         # fallback final
         return Acao(0, 0)
+
+class AgenteForaging:
+    def __init__(self):
+

@@ -10,10 +10,8 @@ class SensorBase:
 
 class SensorObservacao(SensorBase):
     def observacao(self):
-        # devolve apenas a posição do agente e a direção do farol RETIRAR POS
-        pos = self.world.agent_pos[self.nome]
-        direcao = self.world.observacaoPara(self.nome)
-        return {"pos": pos, "direcao": direcao}
+        # devolve apenas a direção do farol
+        return self.world.observacaoPara(self.nome)
 
 
 class SensorLivre(SensorBase):

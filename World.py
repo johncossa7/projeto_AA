@@ -1,8 +1,3 @@
-# world.py
-
-import random
-
-
 class WorldBase:
     def observacaoPara(self, agente):
         raise NotImplementedError
@@ -15,29 +10,51 @@ class WorldBase:
 
     def terminado(self):
         return False
-    import random
-
-import random
 
 class WorldFarol:
-    def __init__(self, size=10, num_obstaculos=0, farol_pos=None):
-        #Colocar o world como ficheiro
-        self.size = size
+    def __init__(self, ficheiro):
         self._terminado = False
-
-        # definir farol
-        if farol_pos is None:
-            self.farol_pos = (size - 1, size - 1)
-        else:
-            self.farol_pos = farol_pos
-
-        # obstáculos aleatórios
-        possiveis = [(x, y) for x in range(size) for y in range(size)
-                     if (x, y) != self.farol_pos]
-        self.obstaculos = set(random.sample(possiveis, min(num_obstaculos, len(possiveis))))
-
-        # lista de posições de agentes
+        self.obstaculos = set()
         self.agent_pos = []
+        self.spawn_agent_pos = (0,0)
+
+        with open(ficheiro, "r") as f:
+            for linha in f:
+                linha = linha.strip()
+
+                if not linha or linha.startswith("#"):
+                    continue
+
+                partes = linha.split()
+
+                if partes[0] == "SIZE":
+                    self.size = int(partes[1])
+
+                elif partes[0] == "FAROL":
+                    x = int(partes[1])
+                    y = int(partes[2])
+                    self.farol_pos = (x, y)
+
+                elif partes[0] == "OBSTACULO":
+                    x = int(partes[1])
+                    y = int(partes[2])
+                    self.obstaculos.add((x,y))
+
+                elif partes[0] == "AGENTE":
+                    # o Simulator vai criar os agentes, o world só regista posições possíveis
+                    nome = partes[1]
+                    ax = int(partes[2])
+                    ay = int(partes[3])
+                    self.agent_pos.append((ax, ay))
+
+        if not hasattr(self, "size"):
+            raise ValueError("Falta SIZE no ficheiro.")
+
+        if not hasattr(self, "farol_pos"):
+            raise ValueError("Falta FAROL no ficheiro.")
+
+        if self.farol_pos in self.obstaculos:
+            self.obstaculos.remove(self.farol_pos)
 
     def add_agent(self, pos):
         x, y = pos
@@ -102,3 +119,4 @@ class WorldFarol:
         for y in range(self.size):
             print("".join(grid[y]))
         print("-----------------------\n")
+
