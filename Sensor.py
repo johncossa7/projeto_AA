@@ -10,8 +10,17 @@ class SensorBase:
 
 class SensorObservacao(SensorBase):
     def observacao(self):
-        # devolve apenas a direção do farol
-        return self.world.observacaoPara(self.nome)
+        fx, fy = self.world.farol_pos
+        ax, ay = self.world.agent_pos[self.nome]
+
+        # distância atual
+        dist = abs(fx - ax) + abs(fy - ay)
+
+        # adiciona ruído opcional
+        # dist += random.choice([-1,0,1])
+
+        return dist  # o agente só vê distância
+
 
 
 class SensorLivre(SensorBase):
