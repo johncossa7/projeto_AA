@@ -14,7 +14,7 @@ class Simulator:
 
     @staticmethod
     def cria(_):
-        world = WorldFarol(size=10, num_obstaculos=15)
+        world = WorldFarol(size=10, num_obstaculos=35)
         agent = AgenteFarolFixo("Explorer", world)
         return Simulator(world, [agent])
 
