@@ -4,23 +4,14 @@ class SensorBase:
         self.nome = nome_agente
 
     def observacao(self):
-        #metodo abstrato a ser implementado por todos os sensores
+        # metodo abstrato a ser implementado por todos os sensores
         raise NotImplementedError
 
 
 class SensorObservacao(SensorBase):
     def observacao(self):
-        fx, fy = self.world.farol_pos
-        ax, ay = self.world.agent_pos[self.nome]
-
-        # distância atual
-        dist = abs(fx - ax) + abs(fy - ay)
-
-        # adiciona ruído opcional
-        # dist += random.choice([-1,0,1])
-
-        return dist  # o agente só vê distância
-
+        # devolve a direção como string: "N", "SE", "AQUI", etc.
+        return self.world.observacaoPara(self.nome)
 
 
 class SensorLivre(SensorBase):
@@ -43,14 +34,14 @@ class SensorLivre(SensorBase):
         return True
 
     def observacao(self):
-        # devolve a lista de posições disponíveis ao agente
-        x, y = self.world.agent_pos[self.nome]
+        # apenas cruz + ficar parado (compatível com AgenteFarol.MOVS)
+        candidatos = [(1, 0), (-1, 0), (0, 1), (0, -1), (0, 0)]
         livres = []
-        for dy in range(-self.raio, self.raio + 1):
-            for dx in range(-self.raio, self.raio + 1):
-                nx, ny = x + dx, y + dy
-                if 0 <= nx < self.world.size and 0 <= ny < self.world.size:
-                    if (nx, ny) not in self.world.obstaculos:
-                        livres.append((dx, dy))  # relativo ao agente
-        return livres
 
+        x, y = self.world.agent_pos[self.nome]
+        for dx, dy in candidatos:
+            nx, ny = x + dx, y + dy
+            if self._livre(nx, ny):
+                livres.append((dx, dy))
+
+        return livres

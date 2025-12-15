@@ -19,102 +19,132 @@ class AgenteBase:
 # -----------------------------------------------------------
 # 2. AgenteFarol OTIMIZADO (Modo Labirinto)
 # -----------------------------------------------------------
-class AgenteFarol(AgenteBase):
-    # Restrição: Apenas movimentos em cruz (Sem diagonais)
+class AgenteFarolQLearning(AgenteBase):
     MOVS = [(1,0), (-1,0), (0,1), (0,-1), (0,0)]
 
-    def __init__(self, nome, ficheiro_pesos=None):
+    def __init__(self, nome, alpha=0.2, gamma=0.95, epsilon=0.2,
+                 epsilon_min=0.05, epsilon_decay=0.995, qfile=None, modo="LEARNING"):
         super().__init__(nome)
-        self.pesos = {a: random.uniform(-1,1) for a in self.MOVS}
-        self.ultimo_movimento = (0, 0)
+        self.alpha = alpha
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.epsilon_min = epsilon_min
+        self.epsilon_decay = epsilon_decay
+        self.modo = modo  # "LEARNING" ou "TEST"
 
-        self.ficheiro_pesos = ficheiro_pesos
-        if ficheiro_pesos:
-            self.carregar_pesos(ficheiro_pesos)
+        self.q = {}  # dict: state_str -> dict(action_str -> value)
+        self.qfile = qfile
+        if qfile:
+            self.load_q(qfile)
 
-    def age(self):
-        # 1. Ler sensores
-        direcao_farol = ""
-        movimentos_livres = []
+        # para update
+        self._s_prev = None
+        self._a_prev = None
 
-        if not self.sensores:
-            return Acao(0,0)
+    def _state_from_sensors(self):
+        direcao = ""
+        livres = []
 
         for sensor in self.sensores:
             reading = sensor.observacao()
             if isinstance(reading, str):
-                direcao_farol = reading
+                direcao = reading
             elif isinstance(reading, list):
-                movimentos_livres = reading
+                livres = reading
 
-        # 2. Filtrar movimentos
-        # Se o SensorLivre falhar, usa todos. Se funcionar, usa só os livres.
-        opcoes_validas = movimentos_livres if movimentos_livres else self.MOVS
-        possible_moves = [m for m in self.MOVS if m in opcoes_validas]
+        # filtrar livres só para MOVS (cruz + 0)
+        livres_set = set(livres) if livres else set(self.MOVS)
+        mask = tuple(1 if m in livres_set else 0 for m in self.MOVS)
 
-        # Remover (0,0) se houver outras opções para evitar preguiça
-        if len(possible_moves) > 1 and (0,0) in possible_moves:
-            possible_moves.remove((0,0))
+        if direcao == "":
+            direcao = "UNK"
 
-        if not possible_moves:
-            return Acao(0,0)
+        return (direcao, mask)
 
-        # --- ALTERAÇÃO 1: AUMENTAR EXPLORAÇÃO (20%) ---
-        # Aumentado de 0.10 para 0.20 para ajudar a sair de mínimos locais (fitness 284)
-        if random.random() < 0.20:
-            acao = random.choice(possible_moves)
-            self.ultimo_movimento = acao
-            return Acao(*acao)
+    def _skey(self, s):
+        # chave estável para dict/json
+        direcao, mask = s
+        return f"{direcao}|{''.join(map(str,mask))}"
 
-        # 4. Decisão Racional
-        dx_target, dy_target = 0, 0
-        if direcao_farol:
-            if "N" in direcao_farol: dy_target -= 1
-            if "S" in direcao_farol: dy_target += 1
-            if "E" in direcao_farol: dx_target += 1
-            if "W" in direcao_farol: dx_target -= 1
+    def _akey(self, a):
+        return str(tuple(a))  # "(1, 0)" etc.
 
-        melhor_score = -float("inf")
-        melhor_acao = possible_moves[0]
+    def _ensure_state(self, skey):
+        if skey not in self.q:
+            self.q[skey] = {self._akey(a): 0.0 for a in self.MOVS}
 
-        for a in possible_moves:
-            dx, dy = a
-            score = self.pesos[a]
+    def _best_action(self, skey, valid_actions):
+        self._ensure_state(skey)
+        best_a = valid_actions[0]
+        best_v = -float("inf")
+        for a in valid_actions:
+            v = self.q[skey][self._akey(a)]
+            if v > best_v:
+                best_v = v
+                best_a = a
+        return best_a
 
-            # Recompensa Direção
-            # Nota: Mesmo sem diagonais no MOVS, isto funciona porque aproxima num dos eixos
-            if (dx == dx_target and dy == dy_target):
-                score += 0.5
-            elif (dx != 0 and dx == dx_target) or (dy != 0 and dy == dy_target):
-                score += 0.5
+    def age(self):
+        s = self._state_from_sensors()
+        skey = self._skey(s)
+        self._ensure_state(skey)
 
-            # --- ALTERAÇÃO 2: REDUZIR PENALIZAÇÃO (-1.0) ---
-            # Reduzido de -2.5 para -1.0.
-            # Permite recuar se estiver num beco sem saída, sem bloquear.
-            last_dx, last_dy = self.ultimo_movimento
-            if dx == -last_dx and dy == -last_dy and (dx != 0 or dy != 0):
-                score -= 1.0
+        # ações válidas (só as com mask=1)
+        _, mask = s
+        valid_actions = [a for a, ok in zip(self.MOVS, mask) if ok]
+        if len(valid_actions) > 1 and (0,0) in valid_actions:
+            valid_actions.remove((0,0))
 
-            if score > melhor_score:
-                melhor_score = score
-                melhor_acao = a
+        # epsilon-greedy no modo LEARNING; greedy no modo TEST
+        if self.modo == "LEARNING" and random.random() < self.epsilon:
+            a = random.choice(valid_actions)
+        else:
+            a = self._best_action(skey, valid_actions)
 
-        self.ultimo_movimento = melhor_acao
-        return Acao(*melhor_acao)
+        # guardar para update
+        self._s_prev = s
+        self._a_prev = a
 
-    def salvar_pesos(self, ficheiro=None):
-        f = ficheiro or self.ficheiro_pesos
-        if f:
-            with open(f, "w") as file:
-                json.dump({str(k): v for k,v in self.pesos.items()}, file)
+        return Acao(*a)
 
-    def carregar_pesos(self, ficheiro):
+    def avaliacaoEstadoAtual(self, recompensa):
+        # se ainda não há transição anterior, não atualiza
+        if self._s_prev is None or self._a_prev is None:
+            return
+
+        if self.modo != "LEARNING":
+            return
+
+        # estado atual (s')
+        s2 = self._state_from_sensors()
+        skey = self._skey(self._s_prev)
+        skey2 = self._skey(s2)
+        self._ensure_state(skey)
+        self._ensure_state(skey2)
+
+        akey = self._akey(self._a_prev)
+
+        # Q-learning update:
+        # Q(s,a) <- Q(s,a) + alpha*(r + gamma*max_a' Q(s',a') - Q(s,a))
+        max_next = max(self.q[skey2].values())
+        old = self.q[skey][akey]
+        target = recompensa + self.gamma * max_next
+        self.q[skey][akey] = old + self.alpha * (target - old)
+
+    def fim_episodio(self):
+        # reduzir epsilon após episódio
+        if self.modo == "LEARNING":
+            self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+        self._s_prev = None
+        self._a_prev = None
+
+    def save_q(self, path):
+        with open(path, "w") as f:
+            json.dump(self.q, f)
+
+    def load_q(self, path):
         try:
-            with open(ficheiro, "r") as f:
-                dados = json.load(f)
-                self.pesos = {}
-                for k, v in dados.items():
-                    key_tuple = tuple(map(int, k.replace('(','').replace(')','').split(',')))
-                    self.pesos[key_tuple] = v
+            with open(path, "r") as f:
+                self.q = json.load(f)
         except FileNotFoundError:
-            pass # Inicia com pesos aleatórios se não existir ficheiro
+            self.q = {}

@@ -1,7 +1,7 @@
 import time
 from World import WorldFarol
 from Sensor import SensorObservacao, SensorLivre
-from Agent import AgenteFarol
+from Agent import AgenteFarolQLearning
 
 class Simulator:
     def __init__(self, world, agents):
@@ -23,7 +23,7 @@ class Simulator:
         world = WorldFarol(ficheiro)
         agents = []
         for i, (ax, ay) in enumerate(world.agent_pos):
-            ag = AgenteFarol(f"Agente{i}")
+            ag = AgenteFarolQLearning(f"Agente{i}")
             ag.instala(SensorObservacao(world, i))
             ag.instala(SensorLivre(world, i))
             agents.append(ag)
